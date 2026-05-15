@@ -7,6 +7,8 @@ const {
   editExpense,
   deleteExpense,
   getUserExpenses,
+  settleUp,
+  getGroupPayments,
 } = require("../controllers/expenseController.js");
 const { protect } = require("../middleware/authMiddleware.js");
 
@@ -15,6 +17,10 @@ router.use(protect); // All routes require authentication
 router.route("/user/expenses").get(getUserExpenses);
 
 router.route("/:id/expenses").post(addExpense).get(getGroupExpenses);
+
+router.post("/:id/settle", settleUp);
+
+router.get("/:id/payments", getGroupPayments);
 
 router.route("/:id/balances").get(getGroupBalances);
 

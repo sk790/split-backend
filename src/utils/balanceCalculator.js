@@ -1,6 +1,6 @@
 ﻿exports.calculateBalances = (expenses, members) => {
   const balanceMap = {};
-  
+
   members.forEach(member => {
     balanceMap[member._id.toString()] = {
       userId: member._id.toString(),
@@ -25,11 +25,11 @@
 
     expense.splitBetween.forEach(person => {
       const personId = person._id.toString();
-      
+
       if (personId !== payerId) {
         if (balanceMap[personId]) {
           balanceMap[personId].totalOwed += perPersonAmount;
-          
+
           if (!balanceMap[personId].owesTo[payerId]) {
             balanceMap[personId].owesTo[payerId] = {
               userId: payerId,
@@ -61,28 +61,28 @@
   });
 
   const balances = Object.values(balanceMap);
-  
+
   balances.forEach(balance => {
     balance.netBalance = balance.totalPaid - balance.totalOwed;
-    
+
     Object.keys(balance.owesTo).forEach(creditorId => {
       if (balance.owedBy[creditorId]) {
-        const owesToCreditor = balance.owesTo[creditorId].amount;
+      const owesToCreditor = balance.owesTo[creditorId].amount;
         const owedByCreditor = balance.owedBy[creditorId].amount;
         
         if (owesToCreditor > owedByCreditor) {
           balance.owesTo[creditorId].amount = owesToCreditor - owedByCreditor;
-          delete balance.owedBy[creditorId];
+        delete balance.owedBy[creditorId];
         } else if (owedByCreditor > owesToCreditor) {
           balance.owedBy[creditorId].amount = owedByCreditor - owesToCreditor;
-          delete balance.owesTo[creditorId];
-        } else {
-          delete balance.owesTo[creditorId];
-          delete balance.owedBy[creditorId];
-        }
+             delete balance.owesTo[creditorId];
+      } else {
+        delete balance.owesTo[creditorId];
+        delete balance.owedBy[creditorId];
+      }
       }
     });
-    
+
     balance.owesTo = Object.values(balance.owesTo);
     balance.owedBy = Object.values(balance.owedBy);
   });
@@ -92,6 +92,8 @@
     expenseCount: expenses.length,
     balances: balances
   };
+  console.log(summary,'summary');
+  
 
   return summary;
 };
