@@ -82,7 +82,9 @@ exports.register = async (req, res) => {
       referredByUser = await User.findOne({
         referralCode: req.body.referralCode.toUpperCase().trim(),
       });
-      console.log(`Referred by user: ${referredByUser ? referredByUser.name : "NOT FOUND"}`);
+      console.log(
+        `Referred by user: ${referredByUser ? referredByUser.name : "NOT FOUND"}`,
+      );
     }
 
     const user = await User.create({
@@ -96,10 +98,14 @@ exports.register = async (req, res) => {
 
     // If referred, give 10 rs to referrer
     if (referredByUser) {
-      console.log(`Crediting 10 rs to ${referredByUser.name} (ID: ${referredByUser._id})`);
+      console.log(
+        `Crediting 10 rs to ${referredByUser.name} (ID: ${referredByUser._id})`,
+      );
       referredByUser.walletBalance = (referredByUser.walletBalance || 0) + 10;
       await referredByUser.save();
-      console.log(`New balance for ${referredByUser.name}: ${referredByUser.walletBalance}`);
+      console.log(
+        `New balance for ${referredByUser.name}: ${referredByUser.walletBalance}`,
+      );
     }
 
     const token = generateToken(user._id);
@@ -143,14 +149,13 @@ exports.login = async (req, res) => {
 
     // Find user by email OR username
     const user = await User.findOne({
-      $or: [
-        { email: loginIdentifier },
-        { username: loginIdentifier }
-      ]
+      $or: [{ email: loginIdentifier }, { username: loginIdentifier }],
     }).select("+password");
 
-    console.log(`Login attempt for: ${loginIdentifier}, User found: ${user ? "Yes" : "No"}`);
-    
+    console.log(
+      `Login attempt for: ${loginIdentifier}, User found: ${user ? "Yes" : "No"}`,
+    );
+
     if (!user) {
       return res.status(401).json({
         success: false,

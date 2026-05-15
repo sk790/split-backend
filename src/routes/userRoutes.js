@@ -9,7 +9,7 @@ const { protect } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.get("/", userList);
-router.get("/search", searchByEmail);
+router.get("/search", protect, searchByEmail);
 router.get("/profile", protect, getUserProfile);
 router.put("/profile", protect, updateProfile);
 
