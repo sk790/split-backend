@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const GroupInvitation = require("../models/GroupInvitation");
 
 exports.userList = async (req, res) => {
   console.log("hello");
@@ -36,8 +37,23 @@ exports.searchByEmail = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Check for pending invitation if groupId is provided
+    let invitationStatus = null;
+    const { groupId } = req.query;
+    if (groupId) {
+      const pendingInvite = await GroupInvitation.findOne({
+        group: groupId,
+        invitee: user._id,
+        status: "pending",
+      });
+      if (pendingInvite) {
+        invitationStatus = "pending";
+      }
+    }
+
     return res.status(200).json({
       message: "User found successfully",
+      invitationStatus,
       user: {
         id: user._id,
         name: user.name,
