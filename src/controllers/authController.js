@@ -78,9 +78,11 @@ exports.register = async (req, res) => {
     // Check for referral
     let referredByUser = null;
     if (req.body.referralCode) {
+      console.log(`Checking referral code: "${req.body.referralCode}"`);
       referredByUser = await User.findOne({
-        referralCode: req.body.referralCode.toUpperCase(),
+        referralCode: req.body.referralCode.toUpperCase().trim(),
       });
+      console.log(`Referred by user: ${referredByUser ? referredByUser.name : "NOT FOUND"}`);
     }
 
     const user = await User.create({
@@ -94,8 +96,10 @@ exports.register = async (req, res) => {
 
     // If referred, give 10 rs to referrer
     if (referredByUser) {
-      referredByUser.walletBalance += 10;
+      console.log(`Crediting 10 rs to ${referredByUser.name} (ID: ${referredByUser._id})`);
+      referredByUser.walletBalance = (referredByUser.walletBalance || 0) + 10;
       await referredByUser.save();
+      console.log(`New balance for ${referredByUser.name}: ${referredByUser.walletBalance}`);
     }
 
     const token = generateToken(user._id);
