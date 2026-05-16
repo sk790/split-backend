@@ -29,6 +29,18 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    referralCode: {
+      type: String,
+      unique: true,
+    },
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    walletBalance: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
