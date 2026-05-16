@@ -11,11 +11,16 @@ exports.userList = async (req, res) => {
 
 exports.searchByEmail = async (req, res) => {
   try {
-    const { email } = req.query;
+    let { email } = req.query;
     console.log(email);
 
     if (!email) {
       return res.status(400).json({ message: "Email or username is required" });
+    }
+
+    // Strip leading @ if present
+    if (email.startsWith("@")) {
+      email = email.substring(1);
     }
 
     const user = await User.findOne({
@@ -50,10 +55,15 @@ exports.searchByEmail = async (req, res) => {
 
 exports.findByUsernameOrEmail = async (req, res) => {
   try {
-    const { query } = req.query;
+    let { query } = req.query;
 
     if (!query) {
       return res.status(400).json({ message: "Username or email is required" });
+    }
+
+    // Strip leading @ if present
+    if (query.startsWith("@")) {
+      query = query.substring(1);
     }
 
     const user = await User.findOne({
