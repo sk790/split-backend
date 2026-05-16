@@ -9,6 +9,8 @@ const {
   getGroupByInvite,
   addUserToGroup,
   removeMember,
+  updateGroup,
+  deleteGroup,
 } = require("../controllers/groupController");
 const { protect } = require("../middleware/authMiddleware.js"); // Your auth middleware
 
@@ -21,5 +23,7 @@ router.post("/:id/regenerate-invite", protect, regenerateInviteCode);
 router.get("/invite/:inviteCode/preview", protect, getGroupByInvite);
 router.post("/:groupId/members", protect, addUserToGroup);
 router.delete("/:groupId/members", protect, removeMember);
+router.put("/:id", protect, updateGroup);
+router.delete("/:id", protect, deleteGroup);
 
 module.exports = router;

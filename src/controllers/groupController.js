@@ -45,12 +45,59 @@ exports.getUserGroups = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const groups = await Group.find({
-      $or: [{ members: userId }, { createdBy: userId }],
-    })
-      .populate("members", "name email")
-      .populate("createdBy", "name email")
-      .sort("-createdAt");
+    const groups = await Group.aggregate([
+      {
+        $match: {
+          $or: [
+            { members: userId },
+            { createdBy: userId }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: "expenses", // MongoDB collection name
+          localField: "_id",
+          foreignField: "groupId",
+          as: "expenses"
+        }
+      },
+      {
+        $addFields: {
+          totalExpense: { $sum: "$expenses.amount" },
+          expenseCount: { $size: "$expenses" }
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "members",
+          foreignField: "_id",
+          as: "members"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "createdBy"
+        }
+      },
+      {
+        $unwind: "$createdBy"
+      },
+      {
+        $project: {
+          expenses: 0, // Don't send full expense list
+          "members.password": 0,
+          "createdBy.password": 0
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      }
+    ]);
 
     res.status(200).json({
       success: true,
@@ -368,6 +415,89 @@ exports.removeMember = async (req, res) => {
       success: true,
       message: "Member removed from group successfully",
       data: group,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Update group
+exports.updateGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(id);
+
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+      });
+    }
+
+    // Only group creator can update group
+    if (group.createdBy.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group creator can update group",
+      });
+    }
+
+    group.name = name || group.name;
+    await group.save();
+    await group.populate("members", "name email");
+    await group.populate("createdBy", "name email");
+
+    res.status(200).json({
+      success: true,
+      message: "Group updated successfully",
+      data: group,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Delete group
+exports.deleteGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(id);
+
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+      });
+    }
+
+    // Only group creator can delete group
+    if (group.createdBy.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group creator can delete group",
+      });
+    }
+
+    // Delete all expenses associated with this group
+    await Expense.deleteMany({ group: id });
+
+    // Delete the group
+    await Group.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Group and its expenses deleted successfully",
     });
   } catch (error) {
     res.status(400).json({
