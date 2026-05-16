@@ -83,20 +83,41 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    let loginIdentifier = email ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    // Strip leading @ if present
+    if (loginIdentifier.startsWith("@")) {
+      loginIdentifier = loginIdentifier.substring(1);
+    }
+
+    if (!loginIdentifier || !password) {
       return res.status(400).json({
         success: false,
-        message: "Please provide email and password",
+        message: "Please provide email/username and password",
       });
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    // Find user by email OR username
+    const user = await User.findOne({
+      $or: [
+        { email: loginIdentifier },
+        { username: loginIdentifier }
+      ]
+    }).select("+password");
+
+    console.log(`Login attempt for: ${loginIdentifier}, User found: ${user ? "Yes" : "No"}`);
+    
     if (!user) {
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
       });
+    }
+
+    // Lazy migration: if user doesn't have a username, generate one
+    if (!user.username) {
+      user.username = await generateUniqueUsername(user.name);
+      await user.save();
     }
 
     const isPasswordMatch = await user.comparePassword(password);
@@ -116,6 +137,7 @@ exports.login = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        username: user.username,
       },
     });
   } catch (error) {
