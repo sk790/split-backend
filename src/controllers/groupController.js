@@ -5,6 +5,9 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 
 exports.createGroup = async (req, res) => {
   try {
+    const { name, members } = req.body;
+    const createdBy = req.user._id;
+
     const membersArray = Array.isArray(members) ? [...new Set(members)] : [];
     
     // Add creator to members array for validation only
@@ -27,9 +30,9 @@ exports.createGroup = async (req, res) => {
     });
 
     // Send invitations to other members if provided
-    if (members && members.length > 0) {
+    if (membersArray.length > 0) {
       const GroupInvitation = require("../models/GroupInvitation");
-      const invitationPromises = members
+      const invitationPromises = membersArray
         .filter(id => id.toString() !== createdBy.toString())
         .map(id => GroupInvitation.create({
           group: group._id,
