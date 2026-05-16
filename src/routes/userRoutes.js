@@ -3,6 +3,7 @@ const {
   userList,
   searchByEmail,
   getUserProfile,
+  updateProfile,
 } = require("../controllers/userController");
 const { protect } = require("../middleware/authMiddleware");
 const router = express.Router();
@@ -10,5 +11,6 @@ const router = express.Router();
 router.get("/", userList);
 router.get("/search", searchByEmail);
 router.get("/profile", protect, getUserProfile);
+router.put("/profile", protect, updateProfile);
 
 module.exports = router;
