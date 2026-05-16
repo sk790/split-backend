@@ -36,6 +36,25 @@ const generateUniqueUsername = async (name) => {
   return username;
 };
 
+// Generate unique referral code
+const generateReferralCode = async () => {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let referralCode;
+  let exists = true;
+
+  while (exists) {
+    referralCode = "";
+    for (let i = 0; i < 8; i++) {
+      referralCode += characters.charAt(
+        Math.floor(Math.random() * characters.length),
+      );
+    }
+    exists = await User.findOne({ referralCode });
+  }
+
+  return referralCode;
+};
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -53,12 +72,31 @@ exports.register = async (req, res) => {
     // Generate unique username from name
     const username = await generateUniqueUsername(name);
 
+    // Generate unique referral code
+    const myReferralCode = await generateReferralCode();
+
+    // Check for referral
+    let referredByUser = null;
+    if (req.body.referralCode) {
+      referredByUser = await User.findOne({
+        referralCode: req.body.referralCode.toUpperCase(),
+      });
+    }
+
     const user = await User.create({
       name,
       email,
       password,
-      username
+      username,
+      referralCode: myReferralCode,
+      referredBy: referredByUser ? referredByUser._id : null,
     });
+
+    // If referred, give 10 rs to referrer
+    if (referredByUser) {
+      referredByUser.walletBalance += 10;
+      await referredByUser.save();
+    }
 
     const token = generateToken(user._id);
 
@@ -70,6 +108,8 @@ exports.register = async (req, res) => {
         name: user.name,
         email: user.email,
         username: user.username,
+        referralCode: user.referralCode,
+        walletBalance: user.walletBalance,
       },
     });
   } catch (error) {
@@ -120,6 +160,12 @@ exports.login = async (req, res) => {
       await user.save();
     }
 
+    // Lazy migration: if user doesn't have a referral code, generate one
+    if (!user.referralCode) {
+      user.referralCode = await generateReferralCode();
+      await user.save();
+    }
+
     const isPasswordMatch = await user.comparePassword(password);
     if (!isPasswordMatch) {
       return res.status(401).json({
@@ -138,6 +184,8 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         username: user.username,
+        referralCode: user.referralCode,
+        walletBalance: user.walletBalance,
       },
     });
   } catch (error) {
