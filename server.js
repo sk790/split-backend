@@ -9,6 +9,7 @@ const groupRoutes = require("./src/routes/groupRoutes.js");
 const expenseRoutes = require("./src/routes/expenseRoutes.js");
 const userRoutes = require("./src/routes/userRoutes.js");
 const walletRoutes = require("./src/routes/walletRoutes.js");
+const groupInvitationRoutes = require("./src/routes/groupInvitationRoutes.js");
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/groups", expenseRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/group-invitations", groupInvitationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
