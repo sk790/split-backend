@@ -31,16 +31,21 @@ exports.createGroup = async (req, res) => {
 
     // Send invitations to other members if provided
     if (membersArray.length > 0) {
+      console.log(`Processing ${membersArray.length} potential invitations`);
       const GroupInvitation = require("../models/GroupInvitation");
       const invitationPromises = membersArray
         .filter(id => id.toString() !== createdBy.toString())
-        .map(id => GroupInvitation.create({
-          group: group._id,
-          inviter: createdBy,
-          invitee: id,
-          status: "pending"
-        }));
+        .map(id => {
+          console.log(`Creating invitation for user: ${id}`);
+          return GroupInvitation.create({
+            group: group._id,
+            inviter: createdBy,
+            invitee: id,
+            status: "pending"
+          });
+        });
       await Promise.all(invitationPromises);
+      console.log(`Successfully created ${invitationPromises.length} invitations`);
     }
     console.log(group, "group");
 

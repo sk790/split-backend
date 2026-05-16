@@ -24,6 +24,7 @@ exports.searchByEmail = async (req, res) => {
     }
 
     const user = await User.findOne({
+      _id: { $ne: req.user._id },
       $or: [
         { username: { $regex: email, $options: "i" } },
         { email: { $regex: email, $options: "i" } },
@@ -67,6 +68,7 @@ exports.findByUsernameOrEmail = async (req, res) => {
     }
 
     const user = await User.findOne({
+      _id: { $ne: req.user._id },
       $or: [{ username: query.toLowerCase() }, { email: query.toLowerCase() }],
     });
 
