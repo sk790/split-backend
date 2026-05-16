@@ -45,12 +45,59 @@ exports.getUserGroups = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const groups = await Group.find({
-      $or: [{ members: userId }, { createdBy: userId }],
-    })
-      .populate("members", "name email")
-      .populate("createdBy", "name email")
-      .sort("-createdAt");
+    const groups = await Group.aggregate([
+      {
+        $match: {
+          $or: [
+            { members: userId },
+            { createdBy: userId }
+          ]
+        }
+      },
+      {
+        $lookup: {
+          from: "expenses", // MongoDB collection name
+          localField: "_id",
+          foreignField: "groupId",
+          as: "expenses"
+        }
+      },
+      {
+        $addFields: {
+          totalExpense: { $sum: "$expenses.amount" },
+          expenseCount: { $size: "$expenses" }
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "members",
+          foreignField: "_id",
+          as: "members"
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "createdBy",
+          foreignField: "_id",
+          as: "createdBy"
+        }
+      },
+      {
+        $unwind: "$createdBy"
+      },
+      {
+        $project: {
+          expenses: 0, // Don't send full expense list
+          "members.password": 0,
+          "createdBy.password": 0
+        }
+      },
+      {
+        $sort: { createdAt: -1 }
+      }
+    ]);
 
     res.status(200).json({
       success: true,
