@@ -5,12 +5,14 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, members } = req.body;
-    const createdBy = req.user._id;
-    members.push(createdBy.toString());
-    if (members && members.length > 0) {
-      const validMembers = await User.find({ _id: { $in: members } });
-      if (validMembers.length !== members.length) {
+    const membersArray = Array.isArray(members) ? [...new Set(members)] : [];
+    
+    // Add creator to members array for validation only
+    const validationIds = [...new Set([...membersArray, createdBy.toString()])];
+
+    if (validationIds.length > 0) {
+      const validMembers = await User.find({ _id: { $in: validationIds } });
+      if (validMembers.length !== validationIds.length) {
         return res.status(400).json({
           success: false,
           message: "One or more invalid member IDs",
@@ -21,8 +23,22 @@ exports.createGroup = async (req, res) => {
     const group = await Group.create({
       name,
       createdBy,
-      members: members || [createdBy],
+      members: [createdBy], // Only creator is a member initially
     });
+
+    // Send invitations to other members if provided
+    if (members && members.length > 0) {
+      const GroupInvitation = require("../models/GroupInvitation");
+      const invitationPromises = members
+        .filter(id => id.toString() !== createdBy.toString())
+        .map(id => GroupInvitation.create({
+          group: group._id,
+          inviter: createdBy,
+          invitee: id,
+          status: "pending"
+        }));
+      await Promise.all(invitationPromises);
+    }
     console.log(group, "group");
 
     await group.populate("members", "name email");
