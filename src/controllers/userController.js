@@ -13,7 +13,7 @@ exports.userList = async (req, res) => {
 exports.searchByEmail = async (req, res) => {
   try {
     let { email } = req.query;
-    console.log(email);
+    // console.log(email);
 
     if (!email) {
       return res.status(400).json({ message: "Email or username is required" });
@@ -31,7 +31,7 @@ exports.searchByEmail = async (req, res) => {
         { email: { $regex: email, $options: "i" } },
       ],
     });
-    console.log(user, "user");
+    // console.log(user, "user");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -186,5 +186,22 @@ exports.updateProfile = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Error updating profile", error: error.message });
+  }
+};
+
+exports.savePushToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "Token is required" });
+    }
+
+    const user = await User.findById(req.user._id);
+    user.expoPushToken = token;
+    await user.save();
+
+    return res.status(200).json({ message: "Push token saved successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Error saving push token", error: error.message });
   }
 };

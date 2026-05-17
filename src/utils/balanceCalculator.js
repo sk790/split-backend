@@ -92,7 +92,7 @@
     expenseCount: expenses.length,
     balances: balances
   };
-  console.log(summary,'summary');
+  // console.log(summary,'summary');
   
 
   return summary;

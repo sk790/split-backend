@@ -47,7 +47,7 @@ exports.createGroup = async (req, res) => {
       await Promise.all(invitationPromises);
       console.log(`Successfully created ${invitationPromises.length} invitations`);
     }
-    console.log(group, "group");
+    // console.log(group, "group");
 
     await group.populate("members", "name email");
     await group.populate("createdBy", "name email");
@@ -138,12 +138,12 @@ exports.getUserGroups = async (req, res) => {
 
 exports.getGroup = async (req, res) => {
   try {
-    console.log(req.params.id);
+    // console.log(req.params.id);
 
     const group = await Group.findById(req.params.id)
       .populate("members", "name email")
       .populate("createdBy", "name email");
-    console.log(group, "kbkbj");
+    // console.log(group, "kbkbj");
 
     if (!group) {
       return res.status(404).json({
@@ -163,7 +163,7 @@ exports.getGroup = async (req, res) => {
         message: "You are not a member of this group",
       });
     }
-    console.log(group, "gr");
+    // console.log(group, "gr");
 
     res.status(200).json({
       success: true,
@@ -318,7 +318,7 @@ exports.addUserToGroup = async (req, res) => {
   try {
     const { groupId } = req.params;
     const { userId } = req.body;
-    console.log(req.body, "body");
+    // console.log(req.body, "body");
 
     // Validate input
     if (!groupId || !userId) {

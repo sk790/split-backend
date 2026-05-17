@@ -58,7 +58,7 @@ const generateReferralCode = async () => {
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    console.log(req.body, "body");
+    // console.log(req.body, "body");
 
     // Check if email already exists
     const existingUser = await User.findOne({ email });

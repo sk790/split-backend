@@ -1,6 +1,7 @@
 const GroupInvitation = require("../models/GroupInvitation");
 const Group = require("../models/Group");
 const User = require("../models/User");
+const { sendPushNotification } = require("../utils/notificationService");
 
 // Send an invitation
 exports.sendInvitation = async (req, res) => {
@@ -41,6 +42,18 @@ exports.sendInvitation = async (req, res) => {
       inviter: inviterId,
       invitee: userId,
     });
+
+    console.log(invitee,'invitee');
+    
+    // Send push notification to invitee
+    if (invitee.expoPushToken) {
+      await sendPushNotification(
+        invitee.expoPushToken,
+        "New Group Invitation 👥",
+        `${req.user.name} invited you to join "${group.name}"`,
+        { type: "GROUP_INVITATION", groupId: group._id }
+      );
+    }
 
     res.status(201).json({
       success: true,
@@ -102,6 +115,17 @@ exports.respondToInvitation = async (req, res) => {
         if (!group.members.includes(req.user._id)) {
           group.members.push(req.user._id);
           await group.save();
+
+          // Notify the inviter
+          const inviter = await User.findById(invitation.inviter);
+          if (inviter && inviter.expoPushToken) {
+            await sendPushNotification(
+              inviter.expoPushToken,
+              "Member Joined! 🎉",
+              `${req.user.name} joined "${group.name}"`,
+              { type: "MEMBER_JOINED", groupId: group._id }
+            );
+          }
         }
       }
     }
