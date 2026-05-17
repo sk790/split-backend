@@ -72,12 +72,17 @@ exports.getMyInvitations = async (req, res) => {
       invitee: req.user._id,
       status: "pending",
     })
-      .populate("group", "name")
+      .populate("group", "name members")
       .populate("inviter", "name email");
+
+    // Filter out invitations for deleted/soft-deleted groups or users
+    const activeInvitations = invitations.filter(
+      (inv) => inv.group !== null && inv.inviter !== null
+    );
 
     res.status(200).json({
       success: true,
-      data: invitations,
+      data: activeInvitations,
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

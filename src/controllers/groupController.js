@@ -82,9 +82,17 @@ exports.getUserGroups = async (req, res) => {
       },
       {
         $lookup: {
-          from: "expenses", // MongoDB collection name
-          localField: "_id",
-          foreignField: "groupId",
+          from: "expenses",
+          let: { groupId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$groupId", "$$groupId"] },
+                isDeleted: { $ne: true },
+                description: { $ne: "Settlement" }
+              }
+            }
+          ],
           as: "expenses"
         }
       },
