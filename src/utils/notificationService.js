@@ -22,6 +22,7 @@ exports.sendPushNotification = async (pushToken, title, body, data = {}) => {
       title,
       body,
       data,
+      url: "split2://", // 🚀 Opens your custom standalone app instead of Expo Go
     },
   ];
 
