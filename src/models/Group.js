@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 const crypto = require("crypto");
 
 const groupSchema = new mongoose.Schema(
@@ -28,11 +28,21 @@ const groupSchema = new mongoose.Schema(
       type: Date,
       default: null, // null means never expires
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+groupSchema.pre(/^find/, function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+
 
 // Generate unique invite code before saving
 groupSchema.pre("save", async function (next) {

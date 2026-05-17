@@ -59,6 +59,7 @@ exports.searchByEmail = async (req, res) => {
         name: user.name,
         email: user.email,
         username: user.username,
+        avatar: user.avatar,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -99,6 +100,7 @@ exports.findByUsernameOrEmail = async (req, res) => {
         name: user.name,
         username: user.username,
         email: user.email,
+        avatar: user.avatar,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -125,6 +127,7 @@ exports.getUserProfile = async (req, res) => {
         username: user.username,
         referralCode: user.referralCode,
         walletBalance: user.walletBalance,
+        avatar: user.avatar,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -137,7 +140,7 @@ exports.getUserProfile = async (req, res) => {
 };
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, username } = req.body;
+    const { name, username, avatar } = req.body;
     const userId = req.user._id;
 
     const user = await User.findById(userId);
@@ -146,6 +149,7 @@ exports.updateProfile = async (req, res) => {
     }
 
     if (name) user.name = name;
+    if (avatar) user.avatar = avatar;
     
     if (username && username !== user.username) {
       // Clean username
@@ -178,6 +182,7 @@ exports.updateProfile = async (req, res) => {
         username: user.username,
         referralCode: user.referralCode,
         walletBalance: user.walletBalance,
+        avatar: user.avatar,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

@@ -6,9 +6,9 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 // Add expense to a group
 exports.addExpense = async (req, res) => {
   try {
-    const { amount, splitBetween, description } = req.body;
+    const { amount, splitBetween, description, paidBy } = req.body;
     const groupId = req.params.id;
-    const paidBy = req.user._id;
+    const paidById = paidBy || req.user._id;
 
     // Verify group exists and user is a member
     const group = await Group.findById(groupId);
@@ -19,11 +19,13 @@ exports.addExpense = async (req, res) => {
       });
     }
 
-    const isMember = group.members.includes(paidBy);
+    const isMember = group.members.some(
+      (member) => member.toString() === paidById.toString()
+    );
     if (!isMember) {
       return res.status(403).json({
         success: false,
-        message: "You are not a member of this group",
+        message: "Paid user is not a member of this group",
       });
     }
 
@@ -41,14 +43,14 @@ exports.addExpense = async (req, res) => {
     // Create expense
     const expense = await Expense.create({
       amount,
-      paidBy,
+      paidBy: paidById,
       splitBetween,
       description,
       groupId,
     });
 
-    await expense.populate("paidBy", "name email");
-    await expense.populate("splitBetween", "name email");
+    await expense.populate("paidBy", "name email avatar");
+    await expense.populate("splitBetween", "name email avatar");
 
     res.status(201).json({
       success: true,
@@ -82,10 +84,10 @@ exports.getGroupExpenses = async (req, res) => {
       });
     }
 
-    // Get expenses
-    const expenses = await Expense.find({ groupId })
-      .populate("paidBy", "name email")
-      .populate("splitBetween", "name email")
+    // Get expenses (excluding old settlement expenses)
+    const expenses = await Expense.find({ groupId, description: { $ne: "Settlement" } })
+      .populate("paidBy", "name email avatar")
+      .populate("splitBetween", "name email avatar")
       .sort("-createdAt");
     res.status(200).json({
       success: true,
@@ -104,7 +106,7 @@ exports.getGroupExpenses = async (req, res) => {
 exports.editExpense = async (req, res) => {
   try {
     const { expenseId, groupId } = req.params;
-    const { amount, splitBetween, description } = req.body;
+    const { amount, splitBetween, description, paidBy } = req.body;
     const userId = req.user._id;
 
     // Verify group exists and user is a member
@@ -165,10 +167,13 @@ exports.editExpense = async (req, res) => {
     expense.amount = amount;
     expense.splitBetween = splitBetween;
     expense.description = description;
+    if (paidBy) {
+      expense.paidBy = paidBy;
+    }
     await expense.save();
 
-    await expense.populate("paidBy", "name email");
-    await expense.populate("splitBetween", "name email");
+    await expense.populate("paidBy", "name email avatar");
+    await expense.populate("splitBetween", "name email avatar");
 
     res.status(200).json({
       success: true,
@@ -230,8 +235,9 @@ exports.deleteExpense = async (req, res) => {
       });
     }
 
-    // Delete expense
-    await Expense.findByIdAndDelete(expenseId);
+    // Soft delete expense
+    expense.isDeleted = true;
+    await expense.save();
 
     res.status(200).json({
       success: true,
@@ -254,8 +260,8 @@ exports.getUserExpenses = async (req, res) => {
     const expenses = await Expense.find({
       $or: [{ paidBy: userId }, { splitBetween: userId }],
     })
-      .populate("paidBy", "name email")
-      .populate("splitBetween", "name email")
+      .populate("paidBy", "name email avatar")
+      .populate("splitBetween", "name email avatar")
       .populate("groupId", "name")
       .sort("-createdAt");
 
@@ -299,13 +305,18 @@ exports.getGroupBalances = async (req, res) => {
       });
     }
 
-    // Get all expenses for the group
-    const expenses = await Expense.find({ groupId })
-      .populate("paidBy", "name email")
-      .populate("splitBetween", "name email");
+    // Get all expenses for the group (excluding old settlement expenses)
+    const expenses = await Expense.find({ groupId, description: { $ne: "Settlement" } })
+      .populate("paidBy", "name email avatar")
+      .populate("splitBetween", "name email avatar");
 
-    // Calculate balances
-    const balances = calculateBalances(expenses, group.members);
+    // Get all payments for the group
+    const payments = await Payment.find({ groupId })
+      .populate("paidBy", "name email avatar")
+      .populate("paidTo", "name email avatar");
+
+    // Calculate balances with payments incorporated
+    const balances = calculateBalances(expenses, group.members, payments);
 
     res.status(200).json({
       success: true,
@@ -321,9 +332,11 @@ exports.getGroupBalances = async (req, res) => {
 // Settle up amount
 exports.settleUp = async (req, res) => {
   try {
-    const { amount, toUserId } = req.body;
+    const { amount, fromUserId, toUserId } = req.body;
     const groupId = req.params.id;
-    const paidBy = req.user._id;
+    
+    // Payer is the debtor (fromUserId) or the logged-in user (as fallback)
+    const payerId = fromUserId || req.user._id;
     
     // Verify group exists
     const group = await Group.findById(groupId);
@@ -336,11 +349,10 @@ exports.settleUp = async (req, res) => {
 
     // Check if both users are members
     const isPayerMember = group.members.some(
-      (member) => member.toString() === paidBy.toString()
+      (member) => member.toString() === payerId.toString()
     );
-    // paidTo is passed as a string ID
     const isPayeeMember = group.members.some(
-      (member) => member.toString() === toUserId
+      (member) => member.toString() === toUserId.toString()
     );
 
     if (!isPayerMember || !isPayeeMember) {
@@ -350,27 +362,23 @@ exports.settleUp = async (req, res) => {
       });
     }
 
-    // Create settlement as an Expense to adjust balances automatically
-    // When B pays A, we create an expense where B paid, and A is the only one in 'splitBetween'.
-    // This means A "owes" B this amount, which cancels out the debt B owed A.
-    // Ensure amount is positive for the model and calculation logic
     const settlementAmount = Math.abs(amount);
     
-    const expense = await Expense.create({
-      amount: settlementAmount,
-      paidBy,
-      splitBetween: [toUserId],
-      description: "Settlement",
+    // Create a real payment in Payment collection instead of an Expense
+    const payment = await Payment.create({
       groupId,
+      paidBy: payerId,
+      paidTo: toUserId,
+      amount: settlementAmount,
     });
 
-    await expense.populate("paidBy", "name email");
-    await expense.populate("splitBetween", "name email");
+    await payment.populate("paidBy", "name email avatar");
+    await payment.populate("paidTo", "name email avatar");
 
     res.status(201).json({
       success: true,
-      data: expense,
-      message: "Settlement recorded successfully",
+      data: payment,
+      message: "Settlement payment recorded successfully",
     });
   } catch (error) {
     res.status(400).json({
@@ -406,8 +414,8 @@ exports.getGroupPayments = async (req, res) => {
 
     // Get payments
     const payments = await Payment.find({ groupId })
-      .populate("paidBy", "name email")
-      .populate("paidTo", "name email")
+      .populate("paidBy", "name email avatar")
+      .populate("paidTo", "name email avatar")
       .sort("-createdAt");
 
     res.status(200).json({

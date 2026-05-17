@@ -1,4 +1,4 @@
-﻿exports.calculateBalances = (expenses, members) => {
+exports.calculateBalances = (expenses, members, payments = []) => {
   const balanceMap = {};
 
   members.forEach(member => {
@@ -62,24 +62,63 @@
 
   const balances = Object.values(balanceMap);
 
+  // 1. Simplify initial debts based on expenses
   balances.forEach(balance => {
     balance.netBalance = balance.totalPaid - balance.totalOwed;
 
     Object.keys(balance.owesTo).forEach(creditorId => {
       if (balance.owedBy[creditorId]) {
-      const owesToCreditor = balance.owesTo[creditorId].amount;
+        const owesToCreditor = balance.owesTo[creditorId].amount;
         const owedByCreditor = balance.owedBy[creditorId].amount;
         
         if (owesToCreditor > owedByCreditor) {
           balance.owesTo[creditorId].amount = owesToCreditor - owedByCreditor;
-        delete balance.owedBy[creditorId];
+          delete balance.owedBy[creditorId];
         } else if (owedByCreditor > owesToCreditor) {
           balance.owedBy[creditorId].amount = owedByCreditor - owesToCreditor;
-             delete balance.owesTo[creditorId];
-      } else {
-        delete balance.owesTo[creditorId];
-        delete balance.owedBy[creditorId];
+          delete balance.owesTo[creditorId];
+        } else {
+          delete balance.owesTo[creditorId];
+          delete balance.owedBy[creditorId];
+        }
       }
+    });
+  });
+
+  // 2. Adjust simplified debts and net balances with recorded payments
+  payments.forEach(payment => {
+    if (!payment.paidBy || !payment.paidTo) return;
+    const payerId = payment.paidBy && payment.paidBy._id ? payment.paidBy._id.toString() : (payment.paidBy ? payment.paidBy.toString() : "");
+    const receiverId = payment.paidTo && payment.paidTo._id ? payment.paidTo._id.toString() : (payment.paidTo ? payment.paidTo.toString() : "");
+    const amount = payment.amount;
+
+    if (!payerId || !receiverId) return;
+
+    if (balanceMap[payerId]) {
+      balanceMap[payerId].netBalance += amount;
+      if (balanceMap[payerId].owesTo[receiverId]) {
+        balanceMap[payerId].owesTo[receiverId].amount -= amount;
+      }
+    }
+
+    if (balanceMap[receiverId]) {
+      balanceMap[receiverId].netBalance -= amount;
+      if (balanceMap[receiverId].owedBy[payerId]) {
+        balanceMap[receiverId].owedBy[payerId].amount -= amount;
+      }
+    }
+  });
+
+  // 3. Clean up simplified debts that have been fully settled/cleared
+  balances.forEach(balance => {
+    Object.keys(balance.owesTo).forEach(creditorId => {
+      if (balance.owesTo[creditorId].amount <= 0) {
+        delete balance.owesTo[creditorId];
+      }
+    });
+    Object.keys(balance.owedBy).forEach(debtorId => {
+      if (balance.owedBy[debtorId].amount <= 0) {
+        delete balance.owedBy[debtorId];
       }
     });
 
@@ -92,8 +131,6 @@
     expenseCount: expenses.length,
     balances: balances
   };
-  // console.log(summary,'summary');
-  
 
   return summary;
 };

@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const expenseSchema = new mongoose.Schema({
   amount: {
@@ -28,6 +28,10 @@ const expenseSchema = new mongoose.Schema({
   },
   perPersonAmount: {
     type: Number
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
@@ -40,4 +44,10 @@ expenseSchema.pre('save', function(next) {
   next();
 });
 
+expenseSchema.pre(/^find/, function(next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
+
 module.exports = mongoose.model('Expense', expenseSchema);
+

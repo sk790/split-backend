@@ -1,6 +1,7 @@
 const Group = require("../models/Group");
 const User = require("../models/User");
 const Expense = require("../models/Expense");
+const Payment = require("../models/Payment");
 const { calculateBalances } = require("../utils/balanceCalculator");
 
 exports.createGroup = async (req, res) => {
@@ -49,8 +50,8 @@ exports.createGroup = async (req, res) => {
     }
     // console.log(group, "group");
 
-    await group.populate("members", "name email");
-    await group.populate("createdBy", "name email");
+    await group.populate("members", "name email avatar");
+    await group.populate("createdBy", "name email avatar");
 
     res.status(201).json({
       success: true,
@@ -72,6 +73,7 @@ exports.getUserGroups = async (req, res) => {
     const groups = await Group.aggregate([
       {
         $match: {
+          isDeleted: { $ne: true },
           $or: [
             { members: userId },
             { createdBy: userId }
@@ -141,8 +143,8 @@ exports.getGroup = async (req, res) => {
     // console.log(req.params.id);
 
     const group = await Group.findById(req.params.id)
-      .populate("members", "name email")
-      .populate("createdBy", "name email");
+      .populate("members", "name email avatar")
+      .populate("createdBy", "name email avatar");
     // console.log(group, "kbkbj");
 
     if (!group) {
@@ -185,8 +187,8 @@ exports.joinGroupByInvite = async (req, res) => {
     const userId = req.user._id;
 
     const group = await Group.findOne({ inviteCode })
-      .populate("members", "name email")
-      .populate("createdBy", "name email");
+      .populate("members", "name email avatar")
+      .populate("createdBy", "name email avatar");
 
     if (!group) {
       return res.status(404).json({
@@ -218,7 +220,7 @@ exports.joinGroupByInvite = async (req, res) => {
     // Add user to group
     group.members.push(userId);
     await group.save();
-    await group.populate("members", "name email");
+    await group.populate("members", "name email avatar");
 
     res.status(200).json({
       success: true,
@@ -257,8 +259,8 @@ exports.regenerateInviteCode = async (req, res) => {
     }
 
     await group.regenerateInviteCode();
-    await group.populate("members", "name email");
-    await group.populate("createdBy", "name email");
+    await group.populate("members", "name email avatar");
+    await group.populate("createdBy", "name email avatar");
 
     res.status(200).json({
       success: true,
@@ -280,7 +282,7 @@ exports.getGroupByInvite = async (req, res) => {
     const { inviteCode } = req.params;
 
     const group = await Group.findOne({ inviteCode })
-      .populate("createdBy", "name email")
+      .populate("createdBy", "name email avatar")
       .select("name createdBy inviteCodeExpiry members");
 
     if (!group) {
@@ -360,8 +362,8 @@ exports.addUserToGroup = async (req, res) => {
     // Add user to group
     group.members.push(userId);
     await group.save();
-    await group.populate("members", "name email");
-    await group.populate("createdBy", "name email");
+    await group.populate("members", "name email avatar");
+    await group.populate("createdBy", "name email avatar");
 
     res.status(200).json({
       success: true,
@@ -432,8 +434,8 @@ exports.removeMember = async (req, res) => {
       (member) => member.toString() !== memberId,
     );
     await group.save();
-    await group.populate("members", "name email");
-    await group.populate("createdBy", "name email");
+    await group.populate("members", "name email avatar");
+    await group.populate("createdBy", "name email avatar");
 
     res.status(200).json({
       success: true,
@@ -474,8 +476,8 @@ exports.updateGroup = async (req, res) => {
 
     group.name = name || group.name;
     await group.save();
-    await group.populate("members", "name email");
-    await group.populate("createdBy", "name email");
+    await group.populate("members", "name email avatar");
+    await group.populate("createdBy", "name email avatar");
 
     res.status(200).json({
       success: true,
@@ -513,11 +515,13 @@ exports.deleteGroup = async (req, res) => {
       });
     }
 
-    // Delete all expenses associated with this group
-    await Expense.deleteMany({ group: id });
+    // Soft delete all expenses and payments associated with this group
+    await Expense.updateMany({ groupId: id }, { isDeleted: true });
+    await Payment.updateMany({ groupId: id }, { isDeleted: true });
 
-    // Delete the group
-    await Group.findByIdAndDelete(id);
+    // Soft delete the group
+    group.isDeleted = true;
+    await group.save();
 
     res.status(200).json({
       success: true,

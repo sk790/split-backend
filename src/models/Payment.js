@@ -22,10 +22,19 @@ const paymentSchema = new mongoose.Schema(
       required: [true, "Please provide an amount"],
       min: [0, "Amount must be positive"],
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
   },
 );
+
+paymentSchema.pre(/^find/, function (next) {
+  this.find({ isDeleted: { $ne: true } });
+  next();
+});
 
 module.exports = mongoose.model("Payment", paymentSchema);

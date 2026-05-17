@@ -120,6 +120,7 @@ exports.register = async (req, res) => {
         username: user.username,
         referralCode: user.referralCode,
         walletBalance: user.walletBalance,
+        avatar: user.avatar,
       },
     });
   } catch (error) {
@@ -195,6 +196,7 @@ exports.login = async (req, res) => {
         username: user.username,
         referralCode: user.referralCode,
         walletBalance: user.walletBalance,
+        avatar: user.avatar,
       },
     });
   } catch (error) {
