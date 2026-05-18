@@ -6,7 +6,9 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 // Add expense to a group
 exports.addExpense = async (req, res) => {
   try {
-    const { amount, splitBetween, description, paidBy } = req.body;
+    const { amount, splitBetween, description, paidBy, category } = req.body;
+    console.log(category,'ca');
+    
     const groupId = req.params.id;
     const paidById = paidBy || req.user._id;
 
@@ -47,10 +49,12 @@ exports.addExpense = async (req, res) => {
       splitBetween,
       description,
       groupId,
+      category: category || null
     });
 
     await expense.populate("paidBy", "name email avatar");
     await expense.populate("splitBetween", "name email avatar");
+    await expense.populate("category");
 
     res.status(201).json({
       success: true,
@@ -88,6 +92,7 @@ exports.getGroupExpenses = async (req, res) => {
     const expenses = await Expense.find({ groupId, description: { $ne: "Settlement" } })
       .populate("paidBy", "name email avatar")
       .populate("splitBetween", "name email avatar")
+      .populate("category")
       .sort("-createdAt");
     res.status(200).json({
       success: true,
@@ -106,7 +111,7 @@ exports.getGroupExpenses = async (req, res) => {
 exports.editExpense = async (req, res) => {
   try {
     const { expenseId, groupId } = req.params;
-    const { amount, splitBetween, description, paidBy } = req.body;
+    const { amount, splitBetween, description, paidBy, category } = req.body;
     const userId = req.user._id;
 
     // Verify group exists and user is a member
@@ -170,10 +175,14 @@ exports.editExpense = async (req, res) => {
     if (paidBy) {
       expense.paidBy = paidBy;
     }
+    if (category !== undefined) {
+      expense.category = category || null;
+    }
     await expense.save();
 
     await expense.populate("paidBy", "name email avatar");
     await expense.populate("splitBetween", "name email avatar");
+    await expense.populate("category");
 
     res.status(200).json({
       success: true,
@@ -267,7 +276,8 @@ exports.getUserExpenses = async (req, res) => {
     })
       .populate("paidBy", "name email avatar")
       .populate("splitBetween", "name email avatar")
-      .populate("groupId", "name")
+      .populate("groupId", "name currency")
+      .populate("category")
       .sort("-createdAt");
 
     res.status(200).json({

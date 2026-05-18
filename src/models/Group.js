@@ -28,6 +28,11 @@ const groupSchema = new mongoose.Schema(
       type: Date,
       default: null, // null means never expires
     },
+    currency: {
+      type: String,
+      default: "INR",
+      enum: ["INR", "USD", "EUR", "GBP", "JPY", "CAD", "AUD"],
+    },
     isDeleted: {
       type: Boolean,
       default: false,

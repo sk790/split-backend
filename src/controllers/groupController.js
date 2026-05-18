@@ -6,7 +6,7 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 
 exports.createGroup = async (req, res) => {
   try {
-    const { name, members } = req.body;
+    const { name, members, currency } = req.body;
     const createdBy = req.user._id;
 
     const membersArray = Array.isArray(members) ? [...new Set(members)] : [];
@@ -28,6 +28,7 @@ exports.createGroup = async (req, res) => {
       name,
       createdBy,
       members: [createdBy], // Only creator is a member initially
+      currency: currency || "INR",
     });
 
     // Send invitations to other members if provided
@@ -347,6 +348,14 @@ exports.addUserToGroup = async (req, res) => {
       });
     }
 
+    // Only group creator (admin) can add members directly
+    if (group.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group admin can add members directly",
+      });
+    }
+
     // Check if user exists
     const user = await User.findById(userId);
     if (!user) {
@@ -462,7 +471,7 @@ exports.removeMember = async (req, res) => {
 exports.updateGroup = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, currency } = req.body;
     const userId = req.user._id;
 
     const group = await Group.findById(id);
@@ -483,6 +492,7 @@ exports.updateGroup = async (req, res) => {
     }
 
     group.name = name || group.name;
+    if (currency) group.currency = currency;
     await group.save();
     await group.populate("members", "name email avatar");
     await group.populate("createdBy", "name email avatar");

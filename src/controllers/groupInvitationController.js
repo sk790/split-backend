@@ -15,6 +15,14 @@ exports.sendInvitation = async (req, res) => {
       return res.status(404).json({ success: false, message: "Group not found" });
     }
 
+    // Only group creator (admin) can invite members
+    if (group.createdBy.toString() !== inviterId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Only group admin can invite members to this group",
+      });
+    }
+
     // Check if user exists
     const invitee = await User.findById(userId);
     if (!invitee) {

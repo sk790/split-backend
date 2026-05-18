@@ -29,6 +29,11 @@ const expenseSchema = new mongoose.Schema({
   perPersonAmount: {
     type: Number
   },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Category',
+    required: false
+  },
   isDeleted: {
     type: Boolean,
     default: false

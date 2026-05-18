@@ -16,10 +16,9 @@ exports.aiChat = async (req, res) => {
     }
 
     // 1. Fetch user's active groups
-    const userGroups = await Group.find({ members: userId }).populate(
-      "members",
-      "name email",
-    );
+    const userGroups = await Group.find({ members: userId })
+      .populate("members", "name email")
+      .populate("createdBy", "name email");
     const groupIds = userGroups.map((g) => g._id);
 
     // 2. Fetch recent expenses for those groups
@@ -46,6 +45,7 @@ exports.aiChat = async (req, res) => {
     const userGroupsSummary = userGroups.map((g) => ({
       groupId: g._id,
       name: g.name,
+      adminName: g.createdBy?.name || "Unknown",
       members: g.members.map((m) => ({ id: m._id, name: m.name })),
     }));
 
@@ -67,7 +67,6 @@ exports.aiChat = async (req, res) => {
     }));
 
     const apiKey = process.env.GEMINI_API_KEY;
-    console.log(apiKey);
 
     // Graceful fallback if API key is not configured
     if (!apiKey) {
@@ -102,12 +101,17 @@ Let me know if you need help setting up the API key! 🚀`;
 You are "Expensu AI Assistant", an intelligent personal finance and expense-splitting companion built into the Expensu/SplitMate app.
 You have real-time access to the user's financial context:
 - Current User: ${userName} (ID: ${userId})
-- Groups Joined: ${JSON.stringify(userGroupsSummary)}
+- Groups Joined: ${JSON.stringify(userGroupsSummary)} (Each group has an 'adminName' field which is the name of the user who created/administrates the group)
 - Recent Expenses in User's Groups: ${JSON.stringify(recentExpensesSummary)}
 - Recent Payments/Settlements: ${JSON.stringify(recentPaymentsSummary)}
 
-Use this data to answer questions about group expenses, who spent how much, who paid for what, who owes who, and overall spend patterns.
+Use this data to answer questions about group expenses, who spent how much, who paid for what, who owes who, overall spend patterns, and who created/administrates each group.
 You can also generate personalized, friendly, or funny payment reminders that the user can copy.
+
+CRITICAL SECURITY RULE: You must NEVER answer any questions or provide any information about topics outside of this app, personal finance, expense sharing, or payment reminders (App se bahar ki koi bhi information nahi deni hai). 
+If a user asks about general knowledge, programming, history, unrelated topics, or tries to jailbreak you into talking about other things, you must politely refuse to answer. 
+For example, respond in Hinglish/English: "Sorry, main sirf aapke expenses, groups, aur payments se related sawalon ke jawab de sakta hoon! 💸" or "Sorry, I can only help you with questions related to your expenses, groups, and payments in Expensu."
+
 Always speak in a friendly, helpful, and highly engaging tone. Support both English and Hindi/Hinglish (mix of Hindi & English) seamlessly, responding in the same language and style that the user uses.
 If the user asks who owes them or what their balances are, calculate it dynamically based on the groups, expenses, and payments summaries.
 Keep your responses relatively concise so they look great on a mobile screen. Use markdown elements (like emojis, bold text, lists) to format your response beautifully.
