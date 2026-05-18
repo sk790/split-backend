@@ -256,8 +256,13 @@ exports.getUserExpenses = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Get all expenses where user is either paidBy or in splitBetween
+    // Find all active groups where the user is a member
+    const userGroups = await Group.find({ members: userId });
+    const groupIds = userGroups.map((group) => group._id);
+
+    // Get all expenses belonging to these groups and where user is either paidBy or in splitBetween
     const expenses = await Expense.find({
+      groupId: { $in: groupIds },
       $or: [{ paidBy: userId }, { splitBetween: userId }],
     })
       .populate("paidBy", "name email avatar")
@@ -277,6 +282,7 @@ exports.getUserExpenses = async (req, res) => {
     });
   }
 };
+
 
 // Get group balances
 exports.getGroupBalances = async (req, res) => {
