@@ -16,7 +16,10 @@ exports.aiChat = async (req, res) => {
     }
 
     // 1. Fetch user's active groups
-    const userGroups = await Group.find({ members: userId }).populate("members", "name email");
+    const userGroups = await Group.find({ members: userId }).populate(
+      "members",
+      "name email",
+    );
     const groupIds = userGroups.map((g) => g._id);
 
     // 2. Fetch recent expenses for those groups
@@ -64,9 +67,10 @@ exports.aiChat = async (req, res) => {
     }));
 
     const apiKey = process.env.GEMINI_API_KEY;
+    console.log(apiKey);
 
     // Graceful fallback if API key is not configured
-    if (!apiKey || apiKey === "AIzaSyBqyWxestACqHrUjRoPI-GKsNMogY6xb4s") {
+    if (!apiKey) {
       const demoResponse = `👋 Hi **${userName}**! I am your **Expensu AI Assistant**!
 
 To activate my full brain power and let me analyze your real-time group balances, please add your **Gemini API Key** to the backend \`.env\` file like this:
@@ -141,7 +145,7 @@ Keep your responses relatively concise so they look great on a mobile screen. Us
           "Content-Type": "application/json",
         },
         body: JSON.stringify(geminiPayload),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -151,7 +155,9 @@ Keep your responses relatively concise so they look great on a mobile screen. Us
     }
 
     const data = await response.json();
-    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't process that. Please try again.";
+    const aiText =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "I couldn't process that. Please try again.";
 
     res.status(200).json({
       success: true,
