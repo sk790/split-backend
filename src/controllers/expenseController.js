@@ -2,6 +2,68 @@ const Payment = require("../models/Payment");
 const Expense = require("../models/Expense");
 const Group = require("../models/Group");
 const { calculateBalances } = require("../utils/balanceCalculator");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+
+const saveBase64Attachment = (base64String) => {
+  if (!base64String || typeof base64String !== "string") return base64String;
+
+  // Check if it's actually a base64 data URI
+  const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+  if (!matches || matches.length !== 3) {
+    return base64String; // Return original (e.g. if it's already an absolute URL)
+  }
+
+  const mimeType = matches[1];
+  const base64Data = matches[2];
+  const buffer = Buffer.from(base64Data, "base64");
+
+  // Determine extension
+  let ext = "";
+  if (mimeType === "application/pdf") {
+    ext = ".pdf";
+  } else if (mimeType === "image/png") {
+    ext = ".png";
+  } else if (mimeType === "image/jpeg" || mimeType === "image/jpg") {
+    ext = ".jpg";
+  } else if (mimeType === "image/webp") {
+    ext = ".webp";
+  } else {
+    const slashIdx = mimeType.indexOf("/");
+    if (slashIdx !== -1) {
+      ext = `.${mimeType.substring(slashIdx + 1)}`;
+    } else {
+      ext = ".bin";
+    }
+  }
+
+  // Ensure images directory exists under src
+  const dirPath = path.join(__dirname, "../images");
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+
+  // Generate unique filename
+  const fileName = `${crypto.randomBytes(16).toString("hex")}${ext}`;
+  const filePath = path.join(dirPath, fileName);
+
+  // Save file to disk
+  fs.writeFileSync(filePath, buffer);
+
+  return fileName; // Return just the filename
+};
+
+const getFileUrl = (req, fileName) => {
+  if (!fileName) return null;
+  // If it's already an absolute URL or data URI, return it as-is
+  if (fileName.startsWith("http") || fileName.startsWith("data:")) {
+    return fileName;
+  }
+  const protocol = req.secure || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
+  const host = req.get("host");
+  return `${protocol}://${host}/images/${fileName}`;
+};
 
 // Add expense to a group
 exports.addExpense = async (req, res) => {
@@ -40,6 +102,9 @@ exports.addExpense = async (req, res) => {
       });
     }
 
+    // Save attachment as file if it is base64
+    const savedFileName = saveBase64Attachment(attachment);
+
     // Create expense
     const expense = await Expense.create({
       amount,
@@ -48,16 +113,19 @@ exports.addExpense = async (req, res) => {
       description,
       groupId,
       category: category || null,
-      attachment: attachment || null
+      attachment: savedFileName || null
     });
 
     await expense.populate("paidBy", "name email avatar");
     await expense.populate("splitBetween", "name email avatar");
     await expense.populate("category");
 
+    const responseExpense = expense.toObject();
+    responseExpense.attachment = getFileUrl(req, expense.attachment);
+
     res.status(201).json({
       success: true,
-      data: expense,
+      data: responseExpense,
     });
   } catch (error) {
     res.status(400).json({
@@ -93,10 +161,16 @@ exports.getGroupExpenses = async (req, res) => {
       .populate("splitBetween", "name email avatar")
       .populate("category")
       .sort("-createdAt");
+    const mappedExpenses = expenses.map((expense) => {
+      const expObj = expense.toObject();
+      expObj.attachment = getFileUrl(req, expense.attachment);
+      return expObj;
+    });
+
     res.status(200).json({
       success: true,
-      count: expenses.length,
-      data: expenses,
+      count: mappedExpenses.length,
+      data: mappedExpenses,
     });
   } catch (error) {
     res.status(400).json({
@@ -178,7 +252,9 @@ exports.editExpense = async (req, res) => {
       expense.category = category || null;
     }
     if (attachment !== undefined) {
-      expense.attachment = attachment || null;
+      // Save attachment as file if it is base64
+      const savedFileName = saveBase64Attachment(attachment);
+      expense.attachment = savedFileName || null;
     }
     await expense.save();
 
@@ -186,9 +262,12 @@ exports.editExpense = async (req, res) => {
     await expense.populate("splitBetween", "name email avatar");
     await expense.populate("category");
 
+    const responseExpense = expense.toObject();
+    responseExpense.attachment = getFileUrl(req, expense.attachment);
+
     res.status(200).json({
       success: true,
-      data: expense,
+      data: responseExpense,
     });
   } catch (error) {
     res.status(400).json({
@@ -282,10 +361,16 @@ exports.getUserExpenses = async (req, res) => {
       .populate("category")
       .sort("-createdAt");
 
+    const mappedExpenses = expenses.map((expense) => {
+      const expObj = expense.toObject();
+      expObj.attachment = getFileUrl(req, expense.attachment);
+      return expObj;
+    });
+
     res.status(200).json({
       success: true,
-      count: expenses.length,
-      data: expenses,
+      count: mappedExpenses.length,
+      data: mappedExpenses,
     });
   } catch (error) {
     res.status(400).json({
