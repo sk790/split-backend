@@ -34,6 +34,10 @@ const expenseSchema = new mongoose.Schema({
     ref: 'Category',
     required: false
   },
+  attachment: {
+    type: String,
+    required: false
+  },
   isDeleted: {
     type: Boolean,
     default: false

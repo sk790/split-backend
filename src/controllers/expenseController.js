@@ -6,7 +6,7 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 // Add expense to a group
 exports.addExpense = async (req, res) => {
   try {
-    const { amount, splitBetween, description, paidBy, category } = req.body;
+    const { amount, splitBetween, description, paidBy, category, attachment } = req.body;
     console.log(category,'ca');
     
     const groupId = req.params.id;
@@ -49,7 +49,8 @@ exports.addExpense = async (req, res) => {
       splitBetween,
       description,
       groupId,
-      category: category || null
+      category: category || null,
+      attachment: attachment || null
     });
 
     await expense.populate("paidBy", "name email avatar");
@@ -111,7 +112,7 @@ exports.getGroupExpenses = async (req, res) => {
 exports.editExpense = async (req, res) => {
   try {
     const { expenseId, groupId } = req.params;
-    const { amount, splitBetween, description, paidBy, category } = req.body;
+    const { amount, splitBetween, description, paidBy, category, attachment } = req.body;
     const userId = req.user._id;
 
     // Verify group exists and user is a member
@@ -177,6 +178,9 @@ exports.editExpense = async (req, res) => {
     }
     if (category !== undefined) {
       expense.category = category || null;
+    }
+    if (attachment !== undefined) {
+      expense.attachment = attachment || null;
     }
     await expense.save();
 
