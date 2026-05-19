@@ -7,6 +7,8 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 exports.addExpense = async (req, res) => {
   try {
     const { amount, splitBetween, description, paidBy, category, attachment } = req.body;
+    console.log(category,'ca');
+    
     const groupId = req.params.id;
     const paidById = paidBy || req.user._id;
 
