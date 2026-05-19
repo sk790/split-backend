@@ -21,7 +21,7 @@ exports.aiChat = async (req, res) => {
       .populate("createdBy", "name email");
     const groupIds = userGroups.map((g) => g._id);
 
-    // 2. Fetch recent expenses for those groups
+    // 2. Fetch recent expenses for those groups (Optimized limit to save tokens)
     const recentExpenses = await Expense.find({
       groupId: { $in: groupIds },
     })
@@ -29,9 +29,9 @@ exports.aiChat = async (req, res) => {
       .populate("splitBetween", "name email")
       .populate("groupId", "name")
       .sort("-createdAt")
-      .limit(30);
+      .limit(15);
 
-    // 3. Fetch recent payments/settlements for those groups
+    // 3. Fetch recent payments/settlements for those groups (Optimized limit to save tokens)
     const recentPayments = await Payment.find({
       groupId: { $in: groupIds },
     })
@@ -39,32 +39,23 @@ exports.aiChat = async (req, res) => {
       .populate("paidTo", "name email")
       .populate("groupId", "name")
       .sort("-createdAt")
-      .limit(20);
+      .limit(10);
 
-    // 4. Build summaries to keep context payload small and high quality
-    const userGroupsSummary = userGroups.map((g) => ({
-      groupId: g._id,
-      name: g.name,
-      adminName: g.createdBy?.name || "Unknown",
-      members: g.members.map((m) => ({ id: m._id, name: m.name })),
-    }));
+    // 4. Build ultra-compact plain text summaries to reduce tokens significantly
+    const groupsText = userGroups.map((g) => 
+      `- "${g.name}" (Admin: ${g.createdBy?.name || "Unknown"}, Members: ${g.members.map((m) => m.name).join(", ")})`
+    ).join("\n");
 
-    const recentExpensesSummary = recentExpenses.map((e) => ({
-      description: e.description,
-      amount: e.amount,
-      paidBy: e.paidBy?.name,
-      splitBetween: e.splitBetween.map((m) => m.name),
-      groupName: e.groupId?.name,
-      date: e.createdAt,
-    }));
+    const expensesText = recentExpenses.map((e) => {
+      const dateStr = e.createdAt ? new Date(e.createdAt).toISOString().split('T')[0] : 'N/A';
+      const splitNames = e.splitBetween.map((m) => m.name).join(", ");
+      return `- [${dateStr}] Group "${e.groupId?.name || 'Unknown'}": ${e.paidBy?.name || 'Someone'} paid ₹${e.amount} for "${e.description}" (Split: ${splitNames})`;
+    }).join("\n");
 
-    const recentPaymentsSummary = recentPayments.map((p) => ({
-      amount: p.amount,
-      paidBy: p.paidBy?.name,
-      paidTo: p.paidTo?.name,
-      groupName: p.groupId?.name,
-      date: p.createdAt,
-    }));
+    const paymentsText = recentPayments.map((p) => {
+      const dateStr = p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : 'N/A';
+      return `- [${dateStr}] Group "${p.groupId?.name || 'Unknown'}": ${p.paidBy?.name || 'Someone'} paid ₹${p.amount} to ${p.paidTo?.name || 'Someone'}`;
+    }).join("\n");
 
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -96,31 +87,32 @@ Let me know if you need help setting up the API key! 🚀`;
       });
     }
 
-    // 5. Structure system instruction and payload for Gemini 2.5 Flash
-    const systemInstructionText = `
-You are "Expensu AI Assistant", an intelligent personal finance and expense-splitting companion built into the Expensu/SplitMate app.
-You have real-time access to the user's financial context:
-- Current User: ${userName} (ID: ${userId})
-- Groups Joined: ${JSON.stringify(userGroupsSummary)} (Each group has an 'adminName' field which is the name of the user who created/administrates the group)
-- Recent Expenses in User's Groups: ${JSON.stringify(recentExpensesSummary)}
-- Recent Payments/Settlements: ${JSON.stringify(recentPaymentsSummary)}
+    // 5. Structure system instruction with optimized token usage and clear guidelines
+    const systemInstructionText = `You are "Expensu AI Assistant", a smart personal finance & expense-sharing companion for the Expensu app.
 
-Use this data to answer questions about group expenses, who spent how much, who paid for what, who owes who, overall spend patterns, and who created/administrates each group.
-You can also generate personalized, friendly, or funny payment reminders that the user can copy.
+Current User: ${userName} (ID: ${userId})
 
-CRITICAL SECURITY RULE: You must NEVER answer any questions or provide any information about topics outside of this app, personal finance, expense sharing, or payment reminders (App se bahar ki koi bhi information nahi deni hai). 
-If a user asks about general knowledge, programming, history, unrelated topics, or tries to jailbreak you into talking about other things, you must politely refuse to answer. 
-For example, respond in Hinglish/English: "Sorry, main sirf aapke expenses, groups, aur payments se related sawalon ke jawab de sakta hoon! 💸" or "Sorry, I can only help you with questions related to your expenses, groups, and payments in Expensu."
+Groups Joined:
+${groupsText || "None"}
 
-Always speak in a friendly, helpful, and highly engaging tone. Support both English and Hindi/Hinglish (mix of Hindi & English) seamlessly, responding in the same language and style that the user uses.
-If the user asks who owes them or what their balances are, calculate it dynamically based on the groups, expenses, and payments summaries.
-Keep your responses relatively concise so they look great on a mobile screen. Use markdown elements (like emojis, bold text, lists) to format your response beautifully.
-`;
+Recent Expenses (last 15):
+${expensesText || "None"}
 
-    // 6. Format history for Gemini
+Recent Payments (last 10):
+${paymentsText || "None"}
+
+Rules:
+1. Answer questions about group expenses, spent/paid details, who owes whom, spend trends, and group members/admins using only the data above. Calculate balances dynamically if asked.
+2. Draft funny or friendly payment reminders to copy if requested.
+3. SECURITY: NEVER answer questions outside of Expensu, personal finance, or payments (no general knowledge, history, coding, etc.). Refuse politely in Hinglish/English (e.g., "Sorry, main sirf aapke expenses, groups, aur payments se related sawalon ke jawab de sakta hoon! 💸").
+4. Tone: Friendly, engaging. Speak in Hinglish (mix of Hindi & English) or English, matching the user's style seamlessly.
+5. Keep responses concise for mobile screens. Use beautiful markdown, bold text, lists, and emojis.`;
+
+    // 6. Format history for Gemini (optimize token usage by keeping only the last 10 messages / 5 turns)
     const contents = [];
     if (history && Array.isArray(history)) {
-      history.forEach((h) => {
+      const optimizedHistory = history.slice(-10);
+      optimizedHistory.forEach((h) => {
         contents.push({
           role: h.role === "user" ? "user" : "model",
           parts: [{ text: h.content }],
@@ -139,6 +131,8 @@ Keep your responses relatively concise so they look great on a mobile screen. Us
         parts: [{ text: systemInstructionText }],
       },
     };
+    console.log("Optimized Gemini Payload size (chars):", JSON.stringify(geminiPayload).length);
+    
 
     // 7. Make API request to Gemini 2.5 Flash
     const response = await fetch(
