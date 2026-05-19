@@ -1,6 +1,5 @@
 require("dotenv").config();
 const express = require("express");
-const path = require("path");
 const cors = require("cors");
 const connectDB = require("./src/config/database.js");
 
@@ -23,7 +22,6 @@ connectDB();
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use("/images", express.static(path.join(__dirname, "src/images")));
 
 // Routes
 app.use("/api/auth", authRoutes);
