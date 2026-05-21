@@ -5,6 +5,7 @@ const {
   getUserGroups,
   getGroup,
   joinGroupByInvite,
+  joinGroupByInviteCode,
   regenerateInviteCode,
   getGroupByInvite,
   addUserToGroup,
@@ -18,6 +19,7 @@ const { protect } = require("../middleware/authMiddleware.js"); // Your auth mid
 router.post("/", protect, createGroup);
 router.get("/", protect, getUserGroups);
 router.get("/:id", protect, getGroup);
+router.post("/join-code", protect, joinGroupByInviteCode);
 router.post("/join/:inviteCode", protect, joinGroupByInvite);
 router.post("/:id/regenerate-invite", protect, regenerateInviteCode);
 router.get("/invite/:inviteCode/preview", protect, getGroupByInvite);

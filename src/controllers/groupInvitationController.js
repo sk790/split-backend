@@ -151,3 +151,27 @@ exports.respondToInvitation = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+// Cancel a sent invitation (by inviter/admin)
+exports.cancelInvitation = async (req, res) => {
+  try {
+    const { groupId, inviteeId } = req.body;
+    const inviterId = req.user._id;
+
+    const invitation = await GroupInvitation.findOne({
+      group: groupId,
+      invitee: inviteeId,
+      inviter: inviterId,
+      status: "pending",
+    });
+
+    if (!invitation) {
+      return res.status(404).json({ success: false, message: "Invitation not found" });
+    }
+
+    await GroupInvitation.deleteOne({ _id: invitation._id });
+
+    res.status(200).json({ success: true, message: "Invitation cancelled successfully" });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

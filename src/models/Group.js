@@ -52,14 +52,42 @@ groupSchema.pre(/^find/, function (next) {
 // Generate unique invite code before saving
 groupSchema.pre("save", async function (next) {
   if (!this.inviteCode) {
-    this.inviteCode = crypto.randomBytes(6).toString("hex");
+    let uniqueCode = "";
+    let isUnique = false;
+    while (!isUnique) {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      let code = "";
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const existingGroup = await mongoose.models.Group.findOne({ inviteCode: code });
+      if (!existingGroup) {
+        uniqueCode = code;
+        isUnique = true;
+      }
+    }
+    this.inviteCode = uniqueCode;
   }
   next();
 });
 
 // Method to regenerate invite code
-groupSchema.methods.regenerateInviteCode = function () {
-  this.inviteCode = crypto.randomBytes(6).toString("hex");
+groupSchema.methods.regenerateInviteCode = async function () {
+  let uniqueCode = "";
+  let isUnique = false;
+  while (!isUnique) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const existingGroup = await mongoose.models.Group.findOne({ inviteCode: code });
+    if (!existingGroup) {
+      uniqueCode = code;
+      isUnique = true;
+    }
+  }
+  this.inviteCode = uniqueCode;
   return this.save();
 };
 

@@ -244,6 +244,71 @@ exports.joinGroupByInvite = async (req, res) => {
   }
 };
 
+// Join group via invite code (passed in req.body.inviteCode)
+exports.joinGroupByInviteCode = async (req, res) => {
+  try {
+    let { inviteCode } = req.body;
+    const userId = req.user._id;
+
+    if (!inviteCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Invite code is required",
+      });
+    }
+
+    // Convert code to uppercase and trim whitespace
+    inviteCode = inviteCode.trim().toUpperCase();
+
+    const group = await Group.findOne({ inviteCode })
+      .populate("members", "name email avatar")
+      .populate("createdBy", "name email avatar");
+
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid invite code",
+      });
+    }
+
+    // Check if invite code is still valid
+    if (!group.isInviteCodeValid()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invite code has expired",
+      });
+    }
+
+    // Check if user is already a member
+    const isMember = group.members.some(
+      (member) => member._id.toString() === userId.toString(),
+    );
+
+    if (isMember) {
+      return res.status(400).json({
+        success: false,
+        message: "You are already a member of this group",
+      });
+    }
+
+    // Add user to group
+    group.members.push(userId);
+    await group.save();
+    await group.populate("members", "name email avatar");
+
+    res.status(200).json({
+      success: true,
+      message: "Successfully joined the group",
+      data: group,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // Regenerate invite code
 exports.regenerateInviteCode = async (req, res) => {
   try {
