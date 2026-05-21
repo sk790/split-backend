@@ -17,47 +17,91 @@ exports.calculateBalances = (expenses, members, payments = []) => {
   expenses.forEach(expense => {
     const payerId = expense.paidBy._id.toString();
     const amount = expense.amount;
-    const perPersonAmount = expense.perPersonAmount;
 
     if (balanceMap[payerId]) {
       balanceMap[payerId].totalPaid += amount;
     }
 
-    expense.splitBetween.forEach(person => {
-      const personId = person._id.toString();
+    const hasCustomSplits = expense.splits && expense.splits.length > 0;
 
-      if (personId !== payerId) {
-        if (balanceMap[personId]) {
-          balanceMap[personId].totalOwed += perPersonAmount;
+    if (hasCustomSplits) {
+      expense.splits.forEach(split => {
+        const splitUser = split.user;
+        if (!splitUser) return;
+        const personId = splitUser._id ? splitUser._id.toString() : splitUser.toString();
+        const customAmt = split.amount || 0;
 
-          if (!balanceMap[personId].owesTo[payerId]) {
-            balanceMap[personId].owesTo[payerId] = {
-              userId: payerId,
-              name: expense.paidBy.name,
-              email: expense.paidBy.email,
-              amount: 0
-            };
+        if (personId !== payerId) {
+          if (balanceMap[personId]) {
+            balanceMap[personId].totalOwed += customAmt;
+
+            if (!balanceMap[personId].owesTo[payerId]) {
+              balanceMap[personId].owesTo[payerId] = {
+                userId: payerId,
+                name: expense.paidBy.name,
+                email: expense.paidBy.email,
+                amount: 0
+              };
+            }
+            balanceMap[personId].owesTo[payerId].amount += customAmt;
           }
-          balanceMap[personId].owesTo[payerId].amount += perPersonAmount;
-        }
 
-        if (balanceMap[payerId]) {
-          if (!balanceMap[payerId].owedBy[personId]) {
-            balanceMap[payerId].owedBy[personId] = {
-              userId: personId,
-              name: person.name,
-              email: person.email,
-              amount: 0
-            };
+          if (balanceMap[payerId]) {
+            if (!balanceMap[payerId].owedBy[personId]) {
+              balanceMap[payerId].owedBy[personId] = {
+                userId: personId,
+                name: splitUser.name || "Group Member",
+                email: splitUser.email || "",
+                amount: 0
+              };
+            }
+            balanceMap[payerId].owedBy[personId].amount += customAmt;
           }
-          balanceMap[payerId].owedBy[personId].amount += perPersonAmount;
+        } else {
+          if (balanceMap[payerId]) {
+            balanceMap[payerId].totalOwed += customAmt;
+          }
         }
-      } else {
-        if (balanceMap[payerId]) {
-          balanceMap[payerId].totalOwed += perPersonAmount;
+      });
+    } else {
+      const perPersonAmount = expense.perPersonAmount || 0;
+      expense.splitBetween.forEach(person => {
+        if (!person) return;
+        const personId = person._id ? person._id.toString() : person.toString();
+
+        if (personId !== payerId) {
+          if (balanceMap[personId]) {
+            balanceMap[personId].totalOwed += perPersonAmount;
+
+            if (!balanceMap[personId].owesTo[payerId]) {
+              balanceMap[personId].owesTo[payerId] = {
+                userId: payerId,
+                name: expense.paidBy.name,
+                email: expense.paidBy.email,
+                amount: 0
+              };
+            }
+            balanceMap[personId].owesTo[payerId].amount += perPersonAmount;
+          }
+
+          if (balanceMap[payerId]) {
+            if (!balanceMap[payerId].owedBy[personId]) {
+              balanceMap[payerId].owedBy[personId] = {
+                userId: personId,
+                name: person.name || "Group Member",
+                email: person.email || "",
+                amount: 0
+              };
+            }
+            balanceMap[payerId].owedBy[personId].amount += perPersonAmount;
+          }
+        } else {
+          if (balanceMap[payerId]) {
+            balanceMap[payerId].totalOwed += perPersonAmount;
+          }
         }
-      }
-    });
+      });
+    }
   });
 
   const balances = Object.values(balanceMap);

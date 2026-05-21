@@ -37,7 +37,24 @@ const expenseSchema = new mongoose.Schema({
   isDeleted: {
     type: Boolean,
     default: false
-  }
+  },
+  attachment: {
+    type: String,
+    default: ""
+  },
+  attachmentPublicId: {
+    type: String,
+    default: ""
+  },
+  splits: [{
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    amount: {
+      type: Number
+    }
+  }]
 }, {
   timestamps: true
 });

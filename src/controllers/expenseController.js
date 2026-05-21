@@ -6,9 +6,7 @@ const { calculateBalances } = require("../utils/balanceCalculator");
 // Add expense to a group
 exports.addExpense = async (req, res) => {
   try {
-    const { amount, splitBetween, description, paidBy, category } = req.body;
-    console.log(category,'ca');
-    
+    const { amount, splitBetween, description, paidBy, category, splits, attachment, attachmentPublicId } = req.body;
     const groupId = req.params.id;
     const paidById = paidBy || req.user._id;
 
@@ -31,9 +29,28 @@ exports.addExpense = async (req, res) => {
       });
     }
 
+    // Resolve splitBetween flat user IDs for validation
+    let finalSplitBetween = [];
+    let finalSplits = [];
+
+    if (Array.isArray(splitBetween)) {
+      const firstItem = splitBetween[0];
+      if (firstItem && typeof firstItem === "object") {
+        // If splitBetween is sent as an array of objects (custom/percentage split)
+        finalSplits = splitBetween.map(item => ({
+          user: item.userId || item.user || item._id,
+          amount: item.amount
+        }));
+        finalSplitBetween = splitBetween.map(item => item.userId || item.user || item._id);
+      } else {
+        finalSplitBetween = splitBetween;
+        finalSplits = splits || [];
+      }
+    }
+
     // Validate splitBetween users are group members
-    const validSplit = splitBetween.every((userId) =>
-      group.members.some((member) => member.toString() === userId),
+    const validSplit = finalSplitBetween.every((userId) =>
+      group.members.some((member) => member.toString() === userId.toString()),
     );
     if (!validSplit) {
       return res.status(400).json({
@@ -46,14 +63,18 @@ exports.addExpense = async (req, res) => {
     const expense = await Expense.create({
       amount,
       paidBy: paidById,
-      splitBetween,
+      splitBetween: finalSplitBetween,
       description,
       groupId,
-      category: category || null
+      category: category || null,
+      splits: finalSplits,
+      attachment: attachment || "",
+      attachmentPublicId: attachmentPublicId || ""
     });
 
     await expense.populate("paidBy", "name email avatar");
     await expense.populate("splitBetween", "name email avatar");
+    await expense.populate("splits.user", "name email avatar");
     await expense.populate("category");
 
     res.status(201).json({
@@ -92,6 +113,7 @@ exports.getGroupExpenses = async (req, res) => {
     const expenses = await Expense.find({ groupId, description: { $ne: "Settlement" } })
       .populate("paidBy", "name email avatar")
       .populate("splitBetween", "name email avatar")
+      .populate("splits.user", "name email avatar")
       .populate("category")
       .sort("-createdAt");
     res.status(200).json({
@@ -111,7 +133,7 @@ exports.getGroupExpenses = async (req, res) => {
 exports.editExpense = async (req, res) => {
   try {
     const { expenseId, groupId } = req.params;
-    const { amount, splitBetween, description, paidBy, category } = req.body;
+    const { amount, splitBetween, description, paidBy, category, splits, attachment, attachmentPublicId } = req.body;
     const userId = req.user._id;
 
     // Verify group exists and user is a member
@@ -156,9 +178,28 @@ exports.editExpense = async (req, res) => {
       });
     }
 
+    // Resolve splitBetween flat user IDs for validation
+    let finalSplitBetween = [];
+    let finalSplits = [];
+
+    if (Array.isArray(splitBetween)) {
+      const firstItem = splitBetween[0];
+      if (firstItem && typeof firstItem === "object") {
+        // If splitBetween is sent as an array of objects (custom/percentage split)
+        finalSplits = splitBetween.map(item => ({
+          user: item.userId || item.user || item._id,
+          amount: item.amount
+        }));
+        finalSplitBetween = splitBetween.map(item => item.userId || item.user || item._id);
+      } else {
+        finalSplitBetween = splitBetween;
+        finalSplits = splits || [];
+      }
+    }
+
     // Validate splitBetween users are group members
-    const validSplit = splitBetween.every((memberId) =>
-      group.members.some((member) => member.toString() === memberId),
+    const validSplit = finalSplitBetween.every((memberId) =>
+      group.members.some((member) => member.toString() === memberId.toString()),
     );
 
     if (!validSplit) {
@@ -168,9 +209,19 @@ exports.editExpense = async (req, res) => {
       });
     }
 
+    // Handle old Cloudinary file deletion if changing the attachment
+    if (attachmentPublicId !== undefined && expense.attachmentPublicId && expense.attachmentPublicId !== attachmentPublicId) {
+      try {
+        const { deleteFromCloudinary } = require("../utils/cloudinaryHelper");
+        await deleteFromCloudinary(expense.attachmentPublicId);
+      } catch (err) {
+        console.error("Failed to delete old attachment from Cloudinary during edit:", err);
+      }
+    }
+
     // Update expense
     expense.amount = amount;
-    expense.splitBetween = splitBetween;
+    expense.splitBetween = finalSplitBetween;
     expense.description = description;
     if (paidBy) {
       expense.paidBy = paidBy;
@@ -178,10 +229,18 @@ exports.editExpense = async (req, res) => {
     if (category !== undefined) {
       expense.category = category || null;
     }
+    if (attachment !== undefined) {
+      expense.attachment = attachment || "";
+    }
+    if (attachmentPublicId !== undefined) {
+      expense.attachmentPublicId = attachmentPublicId || "";
+    }
+    expense.splits = finalSplits;
     await expense.save();
 
     await expense.populate("paidBy", "name email avatar");
     await expense.populate("splitBetween", "name email avatar");
+    await expense.populate("splits.user", "name email avatar");
     await expense.populate("category");
 
     res.status(200).json({
@@ -244,6 +303,16 @@ exports.deleteExpense = async (req, res) => {
       });
     }
 
+    // Delete file from Cloudinary if attachment exists
+    if (expense.attachmentPublicId) {
+      try {
+        const { deleteFromCloudinary } = require("../utils/cloudinaryHelper");
+        await deleteFromCloudinary(expense.attachmentPublicId);
+      } catch (err) {
+        console.error("Failed to delete attachment from Cloudinary during deletion:", err);
+      }
+    }
+
     // Soft delete expense
     expense.isDeleted = true;
     await expense.save();
@@ -276,6 +345,7 @@ exports.getUserExpenses = async (req, res) => {
     })
       .populate("paidBy", "name email avatar")
       .populate("splitBetween", "name email avatar")
+      .populate("splits.user", "name email avatar")
       .populate("groupId", "name currency")
       .populate("category")
       .sort("-createdAt");
@@ -350,10 +420,10 @@ exports.settleUp = async (req, res) => {
   try {
     const { amount, fromUserId, toUserId } = req.body;
     const groupId = req.params.id;
-    
+
     // Payer is the debtor (fromUserId) or the logged-in user (as fallback)
     const payerId = fromUserId || req.user._id;
-    
+
     // Verify group exists
     const group = await Group.findById(groupId);
     if (!group) {
@@ -379,7 +449,7 @@ exports.settleUp = async (req, res) => {
     }
 
     const settlementAmount = Math.abs(amount);
-    
+
     // Create a real payment in Payment collection instead of an Expense
     const payment = await Payment.create({
       groupId,
