@@ -29,7 +29,7 @@ exports.aiChat = async (req, res) => {
       .populate("splitBetween", "name email")
       .populate("groupId", "name")
       .sort("-createdAt")
-      .limit(15);
+      // .limit(15);
 
     // 3. Fetch recent payments/settlements for those groups (Optimized limit to save tokens)
     const recentPayments = await Payment.find({
@@ -39,7 +39,7 @@ exports.aiChat = async (req, res) => {
       .populate("paidTo", "name email")
       .populate("groupId", "name")
       .sort("-createdAt")
-      .limit(10);
+      // .limit(10);
 
     // 4. Build ultra-compact plain text summaries to reduce tokens significantly
     const groupsText = userGroups.map((g) => 

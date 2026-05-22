@@ -7,7 +7,7 @@ exports.userList = async (req, res) => {
   try {
     const users = await User.find();
     return res.status(200).json({ message: "User get succesfully", users });
-  } catch (error) {}
+  } catch (error) { }
 };
 
 exports.searchByEmail = async (req, res) => {
@@ -150,7 +150,7 @@ exports.updateProfile = async (req, res) => {
 
     if (name) user.name = name;
     if (avatar) user.avatar = avatar;
-    
+
     if (username && username !== user.username) {
       // Clean username
       const cleanUsername = username
