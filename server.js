@@ -13,6 +13,7 @@ const groupInvitationRoutes = require("./src/routes/groupInvitationRoutes.js");
 const aiRoutes = require("./src/routes/aiRoutes.js");
 const categoryRoutes = require("./src/routes/categoryRoutes.js");
 const uploadRoutes = require("./src/routes/uploadRoutes.js");
+const friendRoutes = require("./src/routes/friendRoutes.js");
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/api/group-invitations", groupInvitationRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/friends", friendRoutes);
 
 
 // Error handling middleware
