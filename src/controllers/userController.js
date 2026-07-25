@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const GroupInvitation = require("../models/GroupInvitation");
+const Friendship = require("../models/Friendship");
 
 exports.userList = async (req, res) => {
   console.log("hello");
@@ -37,6 +38,16 @@ exports.searchByEmail = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Check if user is an accepted friend
+    const friendship = await Friendship.findOne({
+      status: "accepted",
+      $or: [
+        { requester: req.user._id, recipient: user._id },
+        { requester: user._id, recipient: req.user._id },
+      ],
+    });
+    const isFriend = !!friendship;
+
     // Check for pending invitation if groupId is provided
     let invitationStatus = null;
     const { groupId } = req.query;
@@ -54,6 +65,7 @@ exports.searchByEmail = async (req, res) => {
     return res.status(200).json({
       message: "User found successfully",
       invitationStatus,
+      isFriend,
       user: {
         id: user._id,
         name: user.name,

@@ -11,12 +11,14 @@ exports.createGroup = async (req, res) => {
 
     const membersArray = Array.isArray(members) ? [...new Set(members)] : [];
     
-    // Add creator to members array for validation only
-    const validationIds = [...new Set([...membersArray, createdBy.toString()])];
+    // Combine creator and all selected members into unique array
+    const allMemberIds = [
+      ...new Set([createdBy.toString(), ...membersArray.map((id) => id.toString())]),
+    ];
 
-    if (validationIds.length > 0) {
-      const validMembers = await User.find({ _id: { $in: validationIds } });
-      if (validMembers.length !== validationIds.length) {
+    if (allMemberIds.length > 0) {
+      const validMembers = await User.find({ _id: { $in: allMemberIds } });
+      if (validMembers.length !== allMemberIds.length) {
         return res.status(400).json({
           success: false,
           message: "One or more invalid member IDs",
@@ -27,29 +29,9 @@ exports.createGroup = async (req, res) => {
     const group = await Group.create({
       name,
       createdBy,
-      members: [createdBy], // Only creator is a member initially
+      members: allMemberIds,
       currency: currency || "INR",
     });
-
-    // Send invitations to other members if provided
-    if (membersArray.length > 0) {
-      console.log(`Processing ${membersArray.length} potential invitations`);
-      const GroupInvitation = require("../models/GroupInvitation");
-      const invitationPromises = membersArray
-        .filter(id => id.toString() !== createdBy.toString())
-        .map(id => {
-          console.log(`Creating invitation for user: ${id}`);
-          return GroupInvitation.create({
-            group: group._id,
-            inviter: createdBy,
-            invitee: id,
-            status: "pending"
-          });
-        });
-      await Promise.all(invitationPromises);
-      console.log(`Successfully created ${invitationPromises.length} invitations`);
-    }
-    // console.log(group, "group");
 
     await group.populate("members", "name email avatar");
     await group.populate("createdBy", "name email avatar");
